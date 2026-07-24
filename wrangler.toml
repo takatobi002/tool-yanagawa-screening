@@ -9,4 +9,4 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "yanagawa_screening_db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "12585776-ecfe-487d-b625-495d7beed01c"
