@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>柳川文献スクリーニング｜Guardian Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <span class="brand-mark">柳</span>
+      <div class="brand-text">
+        <h1>柳川文献スクリーニング</h1>
+        <p>Guardian Project ｜ 柳川レビュー論文 一次選定</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="gauge-wrap" id="gaugeWrap" title="全体の評価進捗（水位）">
+    <div class="gauge">
+      <div class="gauge-water" id="gaugeWater"></div>
+      <div class="gauge-mark" style="bottom:25%"></div>
+      <div class="gauge-mark" style="bottom:50%"></div>
+      <div class="gauge-mark" style="bottom:75%"></div>
+    </div>
+    <div class="gauge-label">
+      <strong id="gaugePercent">0%</strong>
+      <span id="gaugeCount">0 / 0 件評価済み</span>
+    </div>
+  </div>
+
+  <div class="reviewer-box">
+    <label for="reviewerInput">評価者</label>
+    <input id="reviewerInput" list="reviewerList" placeholder="例：阿部 / いつみん" autocomplete="off" />
+    <datalist id="reviewerList">
+      <option value="阿部"></option>
+      <option value="いつみん"></option>
+    </datalist>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input id="searchInput" class="search" type="search" placeholder="タイトル・本文スニペットを検索…" />
+
+  <div class="chips" id="filterChips">
+    <button class="chip active" data-filter="all">すべて</button>
+    <button class="chip" data-filter="pending-mine">自分が未評価</button>
+    <button class="chip" data-filter="conflict">対立あり</button>
+    <button class="chip" data-filter="exclude">除外候補</button>
+    <button class="chip" data-filter="maybe">要確認</button>
+    <button class="chip" data-filter="include">含める候補</button>
+  </div>
+
+  <button id="exportBtn" class="export-btn">CSVでエクスポート</button>
+</div>
+
+<main id="paperList" class="paper-list"></main>
+
+<div class="pagination" id="pagination"></div>
+
+<footer class="foot">
+  <span id="totalInfo"></span>
+</footer>
+
+<template id="paperCardTemplate">
+  <article class="card" data-id="">
+    <div class="card-id"></div>
+    <div class="card-body">
+      <h2 class="card-title"><a target="_blank" rel="noopener"></a></h2>
+      <div class="card-meta">
+        <span class="meta-venue"></span>
+        <span class="meta-year"></span>
+      </div>
+      <p class="card-snippet"></p>
+      <div class="card-links"></div>
+
+      <div class="review-panel">
+        <div class="decision-row">
+          <button class="decision-btn" data-decision="include">含める</button>
+          <button class="decision-btn" data-decision="maybe">要確認</button>
+          <button class="decision-btn" data-decision="exclude">除外</button>
+        </div>
+        <select class="category-select" hidden>
+          <option value="">除外・要確認の理由を選択…</option>
+          <option value="not_academic">①学術研究でない（挨拶文・機関誌等）</option>
+          <option value="medical_unrelated">②医学症例（柳川非関連）</option>
+          <option value="affiliation_only">③所属欄のみ柳川（本文言及なし）</option>
+          <option value="municipality_list">④筑後地域等の自治体列挙のみ</option>
+          <option value="other">その他</option>
+        </select>
+        <textarea class="comment-input" placeholder="コメント（任意）" rows="1"></textarea>
+        <button class="save-btn">保存</button>
+      </div>
+
+      <div class="reviews-summary"></div>
+    </div>
+  </article>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>
