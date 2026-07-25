@@ -34,6 +34,7 @@ html, body {
   font-family: var(--sans);
   font-size: 15px;
   line-height: 1.6;
+  overscroll-behavior-x: none;
 }
 
 a { color: var(--indigo); }
@@ -418,6 +419,7 @@ a { color: var(--indigo); }
   position: relative;
   width: 100%;
   height: 480px;
+  overscroll-behavior: contain;
 }
 
 .swipe-card {
@@ -634,4 +636,7 @@ a { color: var(--indigo); }
   .paper-list { padding: 14px 12px 32px; }
   .card { flex-direction: column; }
   .card-id { width: auto; }
+
+  .decision-row { width: 100%; gap: 8px; }
+  .decision-btn { flex: 1; padding: 10px 0; font-size: 13.5px; text-align: center; }
 }
