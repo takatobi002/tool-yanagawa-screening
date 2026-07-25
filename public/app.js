@@ -512,11 +512,13 @@
     let wheelX = 0, wheelY = 0, wheelEngaged = false, wheelTimer = null;
 
     function onWheel(e) {
+      // Always preventDefault immediately (even before we decide to act on it) so the
+      // browser never kicks off its native swipe-navigation preview (page shrink/slide)
+      // on the first events of a horizontal trackpad gesture.
+      e.preventDefault();
       if (state.swipeBusy) return;
       if (dragging) return;
-      if (!wheelEngaged && Math.abs(e.deltaX) < Math.abs(e.deltaY) && Math.abs(e.deltaY) < 4) return;
 
-      e.preventDefault();
       wheelEngaged = true;
       wheelX += e.deltaX;
       wheelY += e.deltaY;
