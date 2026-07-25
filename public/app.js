@@ -9,6 +9,10 @@
     query: "",
     page: 1,
     filtered: [],
+    view: "list", // "list" | "swipe"
+    swipeIndex: 0,
+    swipeHistory: [], // {paperId, previousReview: {...} | null}
+    swipeBusy: false,
   };
 
   const el = {
@@ -23,6 +27,17 @@
     gaugePercent: document.getElementById("gaugePercent"),
     gaugeCount: document.getElementById("gaugeCount"),
     template: document.getElementById("paperCardTemplate"),
+    viewToggle: document.getElementById("viewToggle"),
+    swipeView: document.getElementById("swipeView"),
+    swipeStage: document.getElementById("swipeStage"),
+    swipeEmpty: document.getElementById("swipeEmpty"),
+    swipeProgressText: document.getElementById("swipeProgressText"),
+    swipeUndoBtn: document.getElementById("swipeUndoBtn"),
+    swipeExcludeBtn: document.getElementById("swipeExcludeBtn"),
+    swipeMaybeBtn: document.getElementById("swipeMaybeBtn"),
+    swipeIncludeBtn: document.getElementById("swipeIncludeBtn"),
+    swipeBackToListBtn: document.getElementById("swipeBackToListBtn"),
+    swipeTemplate: document.getElementById("swipeCardTemplate"),
   };
 
   const CATEGORY_LABEL = {
@@ -50,6 +65,34 @@
     });
     applyFilters();
     render();
+    updateGauge();
+  }
+
+  async function postReview(payload) {
+    const res = await fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  }
+
+  async function deleteReview(paperId, reviewer) {
+    await fetch(`/api/reviews?paper_id=${encodeURIComponent(paperId)}&reviewer=${encodeURIComponent(reviewer)}`, {
+      method: "DELETE",
+    });
+  }
+
+  function applyReviewResult(paperId, reviewer, saved) {
+    if (!state.reviewsByPaper.has(paperId)) state.reviewsByPaper.set(paperId, {});
+    state.reviewsByPaper.get(paperId)[reviewer] = saved;
+    updateGauge();
+  }
+
+  function removeReviewResult(paperId, reviewer) {
+    const revs = state.reviewsByPaper.get(paperId);
+    if (!revs) return;
+    delete revs[reviewer];
     updateGauge();
   }
 
@@ -179,21 +222,14 @@
         return;
       }
       saveBtn.textContent = "保存中…";
-      const payload = {
+      const saved = await postReview({
         paper_id: p.id,
         reviewer: state.reviewer,
         decision: currentDecision,
         category: categorySelect.value || null,
         comment: commentInput.value || null,
-      };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
       });
-      const saved = await res.json();
-      if (!state.reviewsByPaper.has(p.id)) state.reviewsByPaper.set(p.id, {});
-      state.reviewsByPaper.get(p.id)[state.reviewer] = saved;
+      applyReviewResult(p.id, state.reviewer, saved);
 
       saveBtn.textContent = "保存済み";
       saveBtn.classList.add("saved");
@@ -204,7 +240,6 @@
 
       renderSummary(node.querySelector(".reviews-summary"), p.id);
       card.classList.toggle("has-conflict", paperHasConflict(p.id));
-      updateGauge();
     });
 
     renderSummary(node.querySelector(".reviews-summary"), p.id);
@@ -303,19 +338,306 @@
     URL.revokeObjectURL(url);
   }
 
+  // ---- swipe view ----
+
+  function enterSwipeView() {
+    state.view = "swipe";
+    el.viewToggle.querySelectorAll(".view-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === "swipe"));
+    el.list.hidden = true;
+    el.pagination.hidden = true;
+    el.swipeView.hidden = false;
+    state.swipeIndex = 0;
+    state.swipeHistory = [];
+    renderSwipeDeck();
+  }
+
+  function enterListView() {
+    state.view = "list";
+    el.viewToggle.querySelectorAll(".view-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === "list"));
+    el.list.hidden = false;
+    el.pagination.hidden = false;
+    el.swipeView.hidden = true;
+  }
+
+  function buildSwipeCard(p) {
+    const node = el.swipeTemplate.content.cloneNode(true);
+    const card = node.querySelector(".swipe-card");
+    card.dataset.id = p.id;
+
+    node.querySelector(".swipe-card-id").textContent = p.id.replace("p", "#");
+
+    const titleLink = node.querySelector(".swipe-card-title a");
+    titleLink.textContent = p.title || "(タイトル不明)";
+    titleLink.href = p.title_url || p.cluster_url || "#";
+
+    node.querySelector(".meta-venue").textContent = p.authors_venue || "";
+    const yearEl = node.querySelector(".meta-year");
+    if (p.year) {
+      yearEl.textContent = p.year;
+    } else {
+      yearEl.remove();
+    }
+
+    node.querySelector(".swipe-card-snippet").textContent = (p.snippet || "").replace(/\s+/g, " ");
+
+    const linksWrap = node.querySelector(".swipe-card-links");
+    if (p.pdf_url) {
+      const a = document.createElement("a");
+      a.href = p.pdf_url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "PDF";
+      linksWrap.appendChild(a);
+    }
+    if (p.cluster_url) {
+      const a = document.createElement("a");
+      a.href = p.cluster_url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "Google Scholar";
+      linksWrap.appendChild(a);
+    }
+
+    const detailToggle = node.querySelector(".swipe-detail-toggle");
+    const detailPanel = node.querySelector(".swipe-detail-panel");
+    detailToggle.addEventListener("click", () => {
+      detailPanel.hidden = !detailPanel.hidden;
+      detailToggle.textContent = detailPanel.hidden ? "＋ 理由・コメントを追加" : "－ 閉じる";
+    });
+
+    const revs = state.reviewsByPaper.get(p.id) || {};
+    const myReview = state.reviewer ? revs[state.reviewer] : null;
+    const note = card.querySelector(".swipe-reviewed-note");
+    if (myReview) {
+      const label = { include: "含める", maybe: "要確認", exclude: "除外" }[myReview.decision] || myReview.decision;
+      note.textContent = `あなたの評価: ${label}（スワイプすると上書きされます）`;
+      card.querySelector(".category-select").value = myReview.category || "";
+      card.querySelector(".comment-input").value = myReview.comment || "";
+    } else {
+      note.remove();
+    }
+
+    return card;
+  }
+
+  function swipeTopCard() {
+    return el.swipeStage.querySelector(".swipe-card:not(.swipe-stack-1):not(.swipe-stack-2)");
+  }
+
+  function renderSwipeDeck() {
+    el.swipeStage.querySelectorAll(".swipe-card").forEach((c) => c.remove());
+
+    const total = state.filtered.length;
+    el.swipeProgressText.textContent = `${Math.min(state.swipeIndex, total)} / ${total}`;
+    el.swipeUndoBtn.disabled = state.swipeHistory.length === 0;
+
+    const deck = state.filtered.slice(state.swipeIndex, state.swipeIndex + 3);
+    if (deck.length === 0) {
+      el.swipeEmpty.hidden = false;
+      return;
+    }
+    el.swipeEmpty.hidden = true;
+
+    deck.forEach((p, idx) => {
+      const cardEl = buildSwipeCard(p);
+      if (idx === 0) {
+        cardEl.style.zIndex = "2";
+        attachSwipeGestures(cardEl, p);
+      } else if (idx === 1) {
+        cardEl.classList.add("swipe-stack-1");
+      } else {
+        cardEl.classList.add("swipe-stack-2");
+      }
+      el.swipeStage.appendChild(cardEl);
+    });
+  }
+
+  function attachSwipeGestures(cardEl, p) {
+    let startX = 0, startY = 0, curX = 0, curY = 0, dragging = false;
+    const threshold = 110;
+
+    const stampInclude = cardEl.querySelector(".swipe-stamp-include");
+    const stampExclude = cardEl.querySelector(".swipe-stamp-exclude");
+    const stampMaybe = cardEl.querySelector(".swipe-stamp-maybe");
+
+    function updateTransform(dx, dy) {
+      cardEl.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx / 18}deg)`;
+      const absX = Math.abs(dx), absY = Math.abs(dy);
+      stampInclude.style.opacity = dx > 20 && absX >= absY ? Math.min(1, dx / threshold) : 0;
+      stampExclude.style.opacity = dx < -20 && absX >= absY ? Math.min(1, -dx / threshold) : 0;
+      stampMaybe.style.opacity = dy < -20 && absY > absX ? Math.min(1, -dy / threshold) : 0;
+    }
+
+    function onPointerDown(e) {
+      if (e.target.closest(".swipe-detail-toggle, .swipe-detail-panel, a")) return;
+      if (state.swipeBusy) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      cardEl.classList.add("swipe-dragging");
+      cardEl.setPointerCapture(e.pointerId);
+    }
+
+    function onPointerMove(e) {
+      if (!dragging) return;
+      curX = e.clientX - startX;
+      curY = e.clientY - startY;
+      updateTransform(curX, curY);
+    }
+
+    function onPointerUp() {
+      if (!dragging) return;
+      dragging = false;
+      cardEl.classList.remove("swipe-dragging");
+      const absX = Math.abs(curX), absY = Math.abs(curY);
+      if (absX > threshold && absX >= absY) {
+        commitSwipe(curX > 0 ? "include" : "exclude", cardEl, p);
+      } else if (absY > threshold && -curY > absX) {
+        commitSwipe("maybe", cardEl, p);
+      } else {
+        cardEl.classList.add("swipe-returning");
+        updateTransform(0, 0);
+        setTimeout(() => cardEl.classList.remove("swipe-returning"), 350);
+      }
+      curX = 0;
+      curY = 0;
+    }
+
+    cardEl.addEventListener("pointerdown", onPointerDown);
+    cardEl.addEventListener("pointermove", onPointerMove);
+    cardEl.addEventListener("pointerup", onPointerUp);
+    cardEl.addEventListener("pointercancel", onPointerUp);
+
+    // trackpad flick (two-finger swipe without a click-drag) — browsers report this as wheel events
+    let wheelX = 0, wheelY = 0, wheelEngaged = false, wheelTimer = null;
+
+    function onWheel(e) {
+      if (state.swipeBusy) return;
+      if (dragging) return;
+      if (!wheelEngaged && Math.abs(e.deltaX) < Math.abs(e.deltaY) && Math.abs(e.deltaY) < 4) return;
+
+      e.preventDefault();
+      wheelEngaged = true;
+      wheelX += e.deltaX;
+      wheelY += e.deltaY;
+      updateTransform(wheelX, wheelY);
+
+      const absX = Math.abs(wheelX), absY = Math.abs(wheelY);
+      clearTimeout(wheelTimer);
+      if (absX > threshold && absX >= absY) {
+        const decision = wheelX > 0 ? "include" : "exclude";
+        wheelEngaged = false;
+        wheelX = 0;
+        wheelY = 0;
+        commitSwipe(decision, cardEl, p);
+        return;
+      }
+      if (absY > threshold && -wheelY > absX) {
+        wheelEngaged = false;
+        wheelX = 0;
+        wheelY = 0;
+        commitSwipe("maybe", cardEl, p);
+        return;
+      }
+
+      wheelTimer = setTimeout(() => {
+        wheelEngaged = false;
+        wheelX = 0;
+        wheelY = 0;
+        cardEl.classList.add("swipe-returning");
+        updateTransform(0, 0);
+        setTimeout(() => cardEl.classList.remove("swipe-returning"), 350);
+      }, 150);
+    }
+
+    cardEl.addEventListener("wheel", onWheel, { passive: false });
+  }
+
+  async function commitSwipe(decision, cardEl, p) {
+    if (state.swipeBusy) return;
+    if (!state.reviewer) {
+      alert("先に右上で評価者名を入力してください。");
+      el.reviewerInput.focus();
+      cardEl.classList.add("swipe-returning");
+      cardEl.style.transform = "";
+      setTimeout(() => cardEl.classList.remove("swipe-returning"), 350);
+      return;
+    }
+
+    state.swipeBusy = true;
+
+    const flyX = decision === "include" ? 700 : decision === "exclude" ? -700 : 0;
+    const flyY = decision === "maybe" ? -800 : 60;
+    cardEl.classList.remove("swipe-dragging");
+    cardEl.classList.add("swipe-flying");
+    cardEl.style.transform = `translate(${flyX}px, ${flyY}px) rotate(${flyX / 18}deg)`;
+    cardEl.style.pointerEvents = "none";
+
+    const categorySelect = cardEl.querySelector(".category-select");
+    const commentInput = cardEl.querySelector(".comment-input");
+    const previousReview = (state.reviewsByPaper.get(p.id) || {})[state.reviewer] || null;
+
+    const saved = await postReview({
+      paper_id: p.id,
+      reviewer: state.reviewer,
+      decision,
+      category: categorySelect.value || null,
+      comment: commentInput.value || null,
+    });
+    applyReviewResult(p.id, state.reviewer, saved);
+    state.swipeHistory.push({ paperId: p.id, previousReview });
+    state.swipeIndex += 1;
+
+    setTimeout(() => {
+      state.swipeBusy = false;
+      renderSwipeDeck();
+    }, 380);
+  }
+
+  async function undoSwipe() {
+    if (state.swipeHistory.length === 0 || state.swipeBusy) return;
+    const last = state.swipeHistory.pop();
+    state.swipeIndex = Math.max(0, state.swipeIndex - 1);
+
+    if (last.previousReview) {
+      const saved = await postReview({
+        paper_id: last.paperId,
+        reviewer: state.reviewer,
+        decision: last.previousReview.decision,
+        category: last.previousReview.category,
+        comment: last.previousReview.comment,
+      });
+      applyReviewResult(last.paperId, state.reviewer, saved);
+    } else {
+      await deleteReview(last.paperId, state.reviewer);
+      removeReviewResult(last.paperId, state.reviewer);
+    }
+    renderSwipeDeck();
+  }
+
+  function refreshCurrentView() {
+    if (state.view === "swipe") {
+      state.swipeIndex = 0;
+      state.swipeHistory = [];
+      renderSwipeDeck();
+    } else {
+      render();
+    }
+  }
+
   // ---- events ----
 
   el.reviewerInput.addEventListener("change", () => {
     state.reviewer = el.reviewerInput.value.trim();
     localStorage.setItem("yanagawa_reviewer", state.reviewer);
     applyFilters();
-    render();
+    refreshCurrentView();
   });
 
   el.searchInput.addEventListener("input", () => {
     state.query = el.searchInput.value;
     applyFilters();
-    render();
+    refreshCurrentView();
   });
 
   el.chips.addEventListener("click", (e) => {
@@ -325,10 +647,61 @@
     btn.classList.add("active");
     state.filter = btn.dataset.filter;
     applyFilters();
-    render();
+    refreshCurrentView();
   });
 
   el.exportBtn.addEventListener("click", exportCSV);
+
+  el.viewToggle.addEventListener("click", (e) => {
+    const btn = e.target.closest(".view-btn");
+    if (!btn) return;
+    if (btn.dataset.view === "swipe") enterSwipeView();
+    else enterListView();
+  });
+
+  el.swipeBackToListBtn.addEventListener("click", enterListView);
+  el.swipeUndoBtn.addEventListener("click", undoSwipe);
+
+  el.swipeExcludeBtn.addEventListener("click", () => {
+    const p = state.filtered[state.swipeIndex];
+    const cardEl = swipeTopCard();
+    if (p && cardEl) commitSwipe("exclude", cardEl, p);
+  });
+  el.swipeMaybeBtn.addEventListener("click", () => {
+    const p = state.filtered[state.swipeIndex];
+    const cardEl = swipeTopCard();
+    if (p && cardEl) commitSwipe("maybe", cardEl, p);
+  });
+  el.swipeIncludeBtn.addEventListener("click", () => {
+    const p = state.filtered[state.swipeIndex];
+    const cardEl = swipeTopCard();
+    if (p && cardEl) commitSwipe("include", cardEl, p);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (state.view !== "swipe") return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      undoSwipe();
+      return;
+    }
+    const p = state.filtered[state.swipeIndex];
+    const cardEl = swipeTopCard();
+    if (!p || !cardEl) return;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      commitSwipe("exclude", cardEl, p);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      commitSwipe("include", cardEl, p);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      commitSwipe("maybe", cardEl, p);
+    }
+  });
 
   init();
 })();

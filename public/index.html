@@ -57,12 +57,39 @@
     <button class="chip" data-filter="include">含める候補</button>
   </div>
 
+  <div class="view-toggle" id="viewToggle">
+    <button class="view-btn active" data-view="list" type="button">📋 リスト</button>
+    <button class="view-btn" data-view="swipe" type="button">🗂 スワイプ</button>
+  </div>
+
   <button id="exportBtn" class="export-btn">CSVでエクスポート</button>
 </div>
 
 <main id="paperList" class="paper-list"></main>
 
 <div class="pagination" id="pagination"></div>
+
+<section id="swipeView" class="swipe-view" hidden>
+  <div class="swipe-progress">
+    <button id="swipeUndoBtn" class="swipe-undo" disabled type="button">↺ 元に戻す</button>
+    <span id="swipeProgressText">0 / 0</span>
+  </div>
+
+  <div class="swipe-stage" id="swipeStage">
+    <div class="swipe-empty" id="swipeEmpty" hidden>
+      <p>🎉 すべて評価しました</p>
+      <button id="swipeBackToListBtn" type="button">リスト表示に戻る</button>
+    </div>
+  </div>
+
+  <div class="swipe-actions">
+    <button class="swipe-action exclude" id="swipeExcludeBtn" type="button" title="除外（←）">✕</button>
+    <button class="swipe-action maybe" id="swipeMaybeBtn" type="button" title="要確認（↑）">？</button>
+    <button class="swipe-action include" id="swipeIncludeBtn" type="button" title="含める（→）">✓</button>
+  </div>
+
+  <p class="swipe-hint">カードをドラッグ、またはボタン／矢印キーで評価　—　右：含める　左：除外　上：要確認</p>
+</section>
 
 <footer class="foot">
   <span id="totalInfo"></span>
@@ -100,6 +127,38 @@
 
       <div class="reviews-summary"></div>
     </div>
+  </article>
+</template>
+
+<template id="swipeCardTemplate">
+  <article class="swipe-card" data-id="">
+    <div class="swipe-card-id"></div>
+    <h2 class="swipe-card-title"><a target="_blank" rel="noopener"></a></h2>
+    <div class="swipe-card-meta">
+      <span class="meta-venue"></span>
+      <span class="meta-year"></span>
+    </div>
+    <p class="swipe-card-snippet"></p>
+    <div class="swipe-card-links"></div>
+
+    <button class="swipe-detail-toggle" type="button">＋ 理由・コメントを追加</button>
+    <div class="swipe-detail-panel" hidden>
+      <select class="category-select">
+        <option value="">除外・要確認の理由を選択…</option>
+        <option value="not_academic">①学術研究でない（挨拶文・機関誌等）</option>
+        <option value="medical_unrelated">②医学症例（柳川非関連）</option>
+        <option value="affiliation_only">③所属欄のみ柳川（本文言及なし）</option>
+        <option value="municipality_list">④筑後地域等の自治体列挙のみ</option>
+        <option value="other">その他</option>
+      </select>
+      <textarea class="comment-input" placeholder="コメント（任意）" rows="2"></textarea>
+    </div>
+
+    <div class="swipe-reviewed-note"></div>
+
+    <div class="swipe-stamp swipe-stamp-include">含める</div>
+    <div class="swipe-stamp swipe-stamp-exclude">除外</div>
+    <div class="swipe-stamp swipe-stamp-maybe">要確認</div>
   </article>
 </template>
 

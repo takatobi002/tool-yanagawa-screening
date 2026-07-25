@@ -25,6 +25,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   background: var(--bg);
@@ -195,6 +197,26 @@ a { color: var(--indigo); }
   color: #F2EFE4;
 }
 
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 3px;
+}
+.view-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.view-btn.active { background: var(--indigo); color: #F2EFE4; }
+
 .export-btn {
   margin-left: auto;
   background: var(--surface-raised);
@@ -355,6 +377,227 @@ a { color: var(--indigo); }
   font-size: 10px;
   color: var(--clay);
   writing-mode: vertical-rl;
+}
+
+/* ---------- Swipe view ---------- */
+
+.swipe-view {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.swipe-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.swipe-undo {
+  border: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.swipe-undo:disabled { opacity: 0.4; cursor: default; }
+.swipe-undo:not(:disabled):hover { border-color: var(--indigo); color: var(--indigo); }
+
+.swipe-stage {
+  position: relative;
+  width: 100%;
+  height: 480px;
+}
+
+.swipe-card {
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 10px 30px rgba(36,35,31,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  touch-action: none;
+  cursor: grab;
+  transform-origin: bottom center;
+  will-change: transform;
+}
+.swipe-card:active { cursor: grabbing; }
+.swipe-card.swipe-dragging { transition: none; }
+.swipe-card.swipe-returning { transition: transform 0.35s cubic-bezier(.2,.8,.2,1); }
+.swipe-card.swipe-flying { transition: transform 0.4s ease, opacity 0.4s ease; opacity: 0; }
+.swipe-card.swipe-stack-1 { transform: scale(0.96) translateY(10px); z-index: 1; }
+.swipe-card.swipe-stack-2 { transform: scale(0.92) translateY(20px); z-index: 0; opacity: 0.7; }
+
+.swipe-card-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+
+.swipe-card-title {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+.swipe-card-title a { color: var(--ink); text-decoration: none; }
+.swipe-card-title a:hover { color: var(--indigo); text-decoration: underline; }
+
+.swipe-card-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.swipe-card-snippet {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+  line-height: 1.65;
+  flex: 1 1 auto;
+}
+
+.swipe-card-links {
+  display: flex;
+  gap: 12px;
+  font-size: 12.5px;
+  margin-bottom: 10px;
+}
+
+.swipe-detail-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--indigo);
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: var(--sans);
+  padding: 4px 0;
+}
+
+.swipe-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.swipe-detail-panel .category-select,
+.swipe-detail-panel .comment-input {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+.swipe-detail-panel .comment-input { resize: vertical; }
+
+.swipe-reviewed-note {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 8px;
+}
+
+.swipe-stamp {
+  position: absolute;
+  top: 24px;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border: 3px solid;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+.swipe-stamp-include { right: 20px; color: var(--moss); border-color: var(--moss); transform: rotate(-12deg); }
+.swipe-stamp-exclude { left: 20px; color: var(--clay); border-color: var(--clay); transform: rotate(12deg); }
+.swipe-stamp-maybe { left: 50%; transform: translateX(-50%) rotate(0deg); color: var(--amber); border-color: var(--amber); }
+
+.swipe-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--ink-soft);
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--hairline);
+  border-radius: 16px;
+}
+.swipe-empty p { font-family: var(--serif); font-size: 18px; margin: 0; }
+.swipe-empty button {
+  background: var(--indigo);
+  color: #F2EFE4;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+.swipe-actions {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.swipe-action {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(36,35,31,0.08);
+}
+.swipe-action.exclude { color: var(--clay); }
+.swipe-action.maybe { color: var(--amber); width: 44px; height: 44px; align-self: center; font-size: 18px; }
+.swipe-action.include { color: var(--moss); }
+.swipe-action:hover.exclude { background: var(--clay-bg); border-color: var(--clay); }
+.swipe-action:hover.maybe { background: var(--amber-bg); border-color: var(--amber); }
+.swipe-action:hover.include { background: var(--moss-bg); border-color: var(--moss); }
+
+.swipe-hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin: 16px 0 6px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .swipe-view { padding: 16px 12px 6px; }
+  .swipe-stage { height: 62vh; }
 }
 
 /* ---------- Pagination / footer ---------- */
